@@ -4,6 +4,10 @@ import pandas as pd
 
 from agents.analyst_agent import ask_agent
 from tools.data_analysis import load_sales_data
+from tools.data_analysis import DATA_PATH
+
+st.write("Dataset path:", str(DATA_PATH))
+st.write("Dataset exists:", DATA_PATH.exists())
 
 from tools.chart_generator import (
     create_bar_chart,
