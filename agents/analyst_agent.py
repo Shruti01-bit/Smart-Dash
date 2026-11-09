@@ -4,6 +4,7 @@ import json
 
 from dotenv import load_dotenv
 from groq import Groq
+from groq.types.chat import ChatCompletionToolParam
 
 from agents.prompts import SYSTEM_PROMPT
 
@@ -17,7 +18,9 @@ from tools.data_analysis import (
 )
 
 
-# 1. Connect Groq
+# ==========================================
+# 1. CONNECT GROQ
+# ==========================================
 
 load_dotenv()
 
@@ -29,9 +32,11 @@ if not api_key:
 client = Groq(api_key=api_key)
 
 
-# 2. Define tools for Groq
+# ==========================================
+# 2. DEFINE TOOLS FOR GROQ
+# ==========================================
 
-TOOLS = [
+TOOLS: list[ChatCompletionToolParam] = [
     {
         "type": "function",
         "function": {
@@ -107,7 +112,9 @@ TOOLS = [
 ]
 
 
-# 3. Map AI tool names to Python functions
+# ==========================================
+# 3. MAP AI TOOL NAMES TO PYTHON FUNCTIONS
+# ==========================================
 
 TOOL_FUNCTIONS = {
     "get_total_sales": get_total_sales,
@@ -119,7 +126,9 @@ TOOL_FUNCTIONS = {
 }
 
 
-# 4. Execute selected Python function
+# ==========================================
+# 4. EXECUTE SELECTED PYTHON FUNCTION
+# ==========================================
 
 def execute_tool(tool_name, arguments=None, df=None):
 
@@ -133,7 +142,9 @@ def execute_tool(tool_name, arguments=None, df=None):
     return function(df=df, **arguments)
 
 
-# 5. AI Agent Tool Calling Loop
+# ==========================================
+# 5. AI AGENT TOOL CALLING LOOP
+# ==========================================
 
 def ask_agent(question, df=None):
 
@@ -189,13 +200,15 @@ def ask_agent(question, df=None):
             messages.append({
                 "role": "tool",
                 "tool_call_id": tool_call.id,
-                "content": json.dumps(result)
+                "content": json.dumps(result, default=str)
             })
 
     return "Maximum tool-calling steps reached."
 
 
-# 6. Run from terminal
+# ==========================================
+# 6. RUN FROM TERMINAL
+# ==========================================
 
 if __name__ == "__main__":
 
