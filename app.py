@@ -3,11 +3,6 @@ import streamlit as st
 import pandas as pd
 
 from agents.analyst_agent import ask_agent
-from tools.data_analysis import load_sales_data
-from tools.data_analysis import DATA_PATH
-
-st.write("Dataset path:", str(DATA_PATH))
-st.write("Dataset exists:", DATA_PATH.exists())
 
 from tools.chart_generator import (
     create_bar_chart,
@@ -108,6 +103,71 @@ div[data-testid="stChatMessage"] {
     padding: 12px;
 }
 
+/* CSV Upload Workspace */
+
+.upload-heading {
+    font-size: 25px;
+    font-weight: 700;
+    color: #FFFFFF;
+    margin-bottom: 8px;
+}
+
+.upload-description {
+    color: #AAB2CC;
+    font-size: 14px;
+    margin-bottom: 18px;
+}
+
+[data-testid="stFileUploader"] {
+    background-color: #1B2340;
+    border: 1px dashed #7657E8;
+    border-radius: 14px;
+    padding: 18px;
+}
+
+[data-testid="stFileUploaderDropzone"] {
+    background-color: #202945;
+    border: 1px dashed #7657E8;
+    border-radius: 12px;
+}
+
+[data-testid="stFileUploaderDropzone"]:hover {
+    border-color: #A18BFF;
+    background-color: #252F50;
+}
+
+[data-testid="stFileUploaderDropzone"] button {
+    background-color: #7657E8;
+    color: white;
+    border: none;
+    border-radius: 8px;
+}
+
+.upload-info-card {
+    background-color: #1B2340;
+    border: 1px solid #303A5C;
+    border-radius: 12px;
+    padding: 18px;
+    height: 125px;
+}
+
+.upload-info-title {
+    color: #FFFFFF;
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.upload-info-text {
+    color: #AAB2CC;
+    font-size: 13px;
+}
+
+[data-testid="stDataFrame"] {
+    border: 1px solid #303A5C;
+    border-radius: 10px;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -187,141 +247,19 @@ with st.sidebar:
 
     st.divider()
 
-    st.subheader(" Upload Dataset")
+    st.subheader("Workspace")
 
-    uploaded_file = st.file_uploader(
-        "Upload any CSV file",
-        type=["csv"],
-        help="Upload a CSV containing category and numeric columns."
-    )
+    if st.session_state.active_df is not None:
 
-    st.session_state.upload_error = None
+        st.success("Dataset loaded")
 
-    if uploaded_file is not None:
-
-        try:
-
-            uploaded_df = read_uploaded_csv(uploaded_file)
-
-            if uploaded_df.empty:
-
-                st.session_state.active_df = None
-                st.session_state.original_df = None
-
-                st.session_state.upload_error = (
-                    "The uploaded CSV is empty."
-                )
-
-            else:
-
-                st.write("**Detected columns:**")
-
-                st.write(uploaded_df.columns.tolist())
-
-                # Find numeric columns
-                numeric_columns = uploaded_df.select_dtypes(
-                    include="number"
-                ).columns.tolist()
-
-                # Find text/category columns
-                category_columns = [
-                    col for col in uploaded_df.columns
-                    if col not in numeric_columns
-                ]
-
-                if not numeric_columns:
-
-                    st.session_state.active_df = None
-                    st.session_state.original_df = None
-
-                    st.session_state.upload_error = (
-                        "No numeric columns found. "
-                        "Please upload a CSV with a numeric value column."
-                    )
-
-                elif not category_columns:
-
-                    st.session_state.active_df = None
-                    st.session_state.original_df = None
-
-                    st.session_state.upload_error = (
-                        "No text/category column found. "
-                        "Please upload a dataset with a category column."
-                    )
-
-                else:
-
-                    # Select category column
-                    category_column = st.selectbox(
-                        "Select category/product column",
-                        options=category_columns,
-                        key=f"category_{uploaded_file.name}"
-                    )
-
-                    # Select numeric column
-                    value_column = st.selectbox(
-                        "Select sales/value column",
-                        options=numeric_columns,
-                        key=f"value_{uploaded_file.name}"
-                    )
-
-                    # Create analysis dataframe
-                    analysis_df = uploaded_df.copy()
-
-                    # Standard columns for AI tools
-                    analysis_df["product"] = (
-                        uploaded_df[category_column]
-                    )
-
-                    analysis_df["sales"] = pd.to_numeric(
-                        uploaded_df[value_column],
-                        errors="coerce"
-                    )
-
-                    # Remove invalid rows
-                    analysis_df = analysis_df.dropna(
-                        subset=["product", "sales"]
-                    )
-
-                    if analysis_df.empty:
-
-                        st.session_state.active_df = None
-                        st.session_state.original_df = None
-
-                        st.session_state.upload_error = (
-                            "No valid records found. "
-                            "Please check your selected columns."
-                        )
-
-                    else:
-
-                        st.session_state.active_df = analysis_df
-                        st.session_state.original_df = uploaded_df
-
-                        st.success("CSV uploaded successfully!")
-
-                        st.caption(
-                            f"Rows: {len(analysis_df)} | "
-                            f"Columns: {len(uploaded_df.columns)}"
-                        )
-
-        except Exception as error:
-
-            st.session_state.active_df = None
-            st.session_state.original_df = None
-
-            st.session_state.upload_error = (
-                f"CSV upload error: {error}"
-            )
+        st.caption(
+            f"{len(st.session_state.active_df):,} records available"
+        )
 
     else:
 
-        st.session_state.active_df = None
-        st.session_state.original_df = None
-
-    if st.session_state.upload_error:
-
-        st.error(st.session_state.upload_error)
+        st.info("Waiting for CSV upload")
 
     st.divider()
 
@@ -335,48 +273,309 @@ with st.sidebar:
 
 
 # ==========================================
-# 6. LOAD DATASET
+# 6. SMART DASH HEADER
+# ==========================================
+
+st.markdown(
+    '<div class="main-title">Smart Dash</div>',
+    unsafe_allow_html=True
+)
+
+st.markdown(
+    '<div class="subtitle">'
+    'Your interactive workspace for business data analysis.'
+    '</div>',
+    unsafe_allow_html=True
+)
+
+
+# ==========================================
+# 7. CSV UPLOAD WORKSPACE
+# ==========================================
+
+with st.container(border=True):
+
+    st.markdown(
+        '<div class="upload-heading">Upload your dataset</div>',
+        unsafe_allow_html=True
+    )
+
+    st.markdown(
+        '<div class="upload-description">'
+        'Import your CSV file to unlock your dashboard, '
+        'visualizations and AI-powered analysis.'
+        '</div>',
+        unsafe_allow_html=True
+    )
+
+    uploaded_file = st.file_uploader(
+        "Choose a CSV file or drag and drop it here",
+        type=["csv"],
+        help="Upload a CSV containing at least one category column and one numeric column.",
+        key="dataset_upload"
+    )
+
+    st.caption(
+        "Supported format: CSV | Your uploaded data is used for this session."
+    )
+
+
+# ==========================================
+# 8. PROCESS UPLOADED DATASET
+# ==========================================
+
+st.session_state.upload_error = None
+
+if uploaded_file is not None:
+
+    try:
+
+        uploaded_df = read_uploaded_csv(uploaded_file)
+
+        if uploaded_df.empty:
+
+            st.session_state.active_df = None
+            st.session_state.original_df = None
+
+            st.session_state.upload_error = (
+                "The uploaded CSV is empty."
+            )
+
+        else:
+
+            st.divider()
+
+            st.markdown(
+                '<div class="section-title">'
+                'Configure your dataset'
+                '</div>',
+                unsafe_allow_html=True
+            )
+
+            numeric_columns = uploaded_df.select_dtypes(
+                include="number"
+            ).columns.tolist()
+
+            category_columns = [
+                col for col in uploaded_df.columns
+                if col not in numeric_columns
+            ]
+
+            if not numeric_columns:
+
+                st.session_state.active_df = None
+                st.session_state.original_df = None
+
+                st.session_state.upload_error = (
+                    "No numeric columns found. "
+                    "Please upload a CSV with a numeric value column."
+                )
+
+            elif not category_columns:
+
+                st.session_state.active_df = None
+                st.session_state.original_df = None
+
+                st.session_state.upload_error = (
+                    "No text/category column found. "
+                    "Please upload a dataset with a category column."
+                )
+
+            else:
+
+                st.caption(
+                    f"File: {uploaded_file.name} | "
+                    f"{len(uploaded_df):,} rows | "
+                    f"{len(uploaded_df.columns)} columns"
+                )
+
+                col1, col2 = st.columns(2)
+
+                with col1:
+
+                    category_column = st.selectbox(
+                        "Select category/product column",
+                        options=category_columns,
+                        key=f"category_{uploaded_file.name}"
+                    )
+
+                with col2:
+
+                    value_column = st.selectbox(
+                        "Select numeric value column",
+                        options=numeric_columns,
+                        key=f"value_{uploaded_file.name}"
+                    )
+
+                # Standard columns for AI tools
+
+                analysis_df = uploaded_df.copy()
+
+                analysis_df["product"] = (
+                    uploaded_df[category_column]
+                )
+
+                analysis_df["sales"] = pd.to_numeric(
+                    uploaded_df[value_column],
+                    errors="coerce"
+                )
+
+                analysis_df = analysis_df.dropna(
+                    subset=["product", "sales"]
+                )
+
+                if analysis_df.empty:
+
+                    st.session_state.active_df = None
+                    st.session_state.original_df = None
+
+                    st.session_state.upload_error = (
+                        "No valid records found. "
+                        "Please check your selected columns."
+                    )
+
+                else:
+
+                    st.session_state.active_df = analysis_df
+                    st.session_state.original_df = uploaded_df
+
+                    st.success(
+                        "Dataset successfully loaded and ready for analysis."
+                    )
+
+                    preview_col1, preview_col2, preview_col3 = st.columns(3)
+
+                    with preview_col1:
+                        st.metric(
+                            "Total Rows",
+                            f"{len(uploaded_df):,}"
+                        )
+
+                    with preview_col2:
+                        st.metric(
+                            "Total Columns",
+                            len(uploaded_df.columns)
+                        )
+
+                    with preview_col3:
+                        st.metric(
+                            "Valid Records",
+                            f"{len(analysis_df):,}"
+                        )
+
+                    with st.expander("Preview uploaded dataset"):
+
+                        st.dataframe(
+                            uploaded_df.head(10),
+                            use_container_width=True,
+                            hide_index=True
+                        )
+
+    except Exception as error:
+
+        st.session_state.active_df = None
+        st.session_state.original_df = None
+
+        st.session_state.upload_error = (
+            f"CSV upload error: {error}"
+        )
+
+
+else:
+
+    st.session_state.active_df = None
+    st.session_state.original_df = None
+
+
+# ==========================================
+# 9. DATASET VALIDATION
 # ==========================================
 
 if st.session_state.upload_error:
 
-    st.warning(
-        "Please upload a valid CSV dataset to continue."
-    )
+    st.error(st.session_state.upload_error)
 
     st.stop()
 
 
-if st.session_state.active_df is not None:
+if st.session_state.active_df is None:
 
-    df = st.session_state.active_df.copy()
+    st.divider()
 
-    display_df = st.session_state.original_df.copy()
+    st.markdown(
+        '<div class="section-title">Your analysis workspace</div>',
+        unsafe_allow_html=True
+    )
 
-else:
+    st.write(
+        "Your dashboard is ready. Upload a CSV file above to get started."
+    )
 
-    try:
+    col1, col2, col3 = st.columns(3)
 
-        df = load_sales_data()
+    with col1:
 
-        display_df = df.copy()
+        st.markdown(
+            """
+            <div class="upload-info-card">
+                <div class="upload-info-title">Business Dashboard</div>
+                <div class="upload-info-text">
+                    Track total sales, averages, maximum values
+                    and important business KPIs.
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
-    except Exception as error:
+    with col2:
 
-        st.error(f"Could not load default dataset: {error}")
-        st.stop()
+        st.markdown(
+            """
+            <div class="upload-info-card">
+                <div class="upload-info-title">Data Visualizations</div>
+                <div class="upload-info-text">
+                    Explore your data through interactive charts,
+                    trends and product comparisons.
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    with col3:
+
+        st.markdown(
+            """
+            <div class="upload-info-card">
+                <div class="upload-info-title">AI Data Analyst</div>
+                <div class="upload-info-text">
+                    Ask questions about your dataset and
+                    receive AI-generated analytical insights.
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    st.divider()
+
+    st.caption("Smart Dash | Made by Shruti Srivastava")
+
+    st.stop()
 
 
-# ==========================================
-# 7. DATA VALIDATION
-# ==========================================
+df = st.session_state.active_df.copy()
+
+display_df = st.session_state.original_df.copy()
+
 
 required_columns = {"product", "sales"}
 
 if not required_columns.issubset(df.columns):
 
     st.error(
-        "Default dataset must contain 'product' and 'sales' columns."
+        "The uploaded dataset must contain valid product and sales mappings."
     )
 
     st.stop()
@@ -399,24 +598,7 @@ if df.empty:
 
 
 # ==========================================
-# 8. HEADER
-# ==========================================
-
-st.markdown(
-    '<div class="main-title">Smart Dash Dashboard</div>',
-    unsafe_allow_html=True
-)
-
-st.markdown(
-    '<div class="subtitle">'
-    'Analyse your business data with the power of AI.'
-    '</div>',
-    unsafe_allow_html=True
-)
-
-
-# ==========================================
-# 9. KPI CALCULATIONS
+# 10. KPI CALCULATIONS
 # ==========================================
 
 total_sales = df["sales"].sum()
@@ -429,7 +611,7 @@ total_records = len(df)
 
 
 # ==========================================
-# 10. KPI CARDS
+# 11. KPI CARDS
 # ==========================================
 
 col1, col2, col3, col4 = st.columns(4)
@@ -484,7 +666,7 @@ with col4:
 
 
 # ==========================================
-# 11. DASHBOARD PAGE
+# 12. DASHBOARD PAGE
 # ==========================================
 
 if page == "Dashboard":
@@ -719,7 +901,7 @@ if page == "Dashboard":
 
 
 # ==========================================
-# 12. AI CHAT PAGE
+# 13. AI CHAT PAGE
 # ==========================================
 
 elif page == "AI Chat":
@@ -801,7 +983,7 @@ elif page == "AI Chat":
 
 
 # ==========================================
-# 13. DATA EXPLORER PAGE
+# 14. DATA EXPLORER PAGE
 # ==========================================
 
 elif page == "Data Explorer":
@@ -876,12 +1058,9 @@ elif page == "Data Explorer":
 
 
 # ==========================================
-# 14. FOOTER
+# 15. FOOTER
 # ==========================================
 
 st.divider()
 
-st.caption(
-    "InsightAI | Built with Python, Pandas, "
-    "Plotly, Streamlit and Groq AI"
-)
+st.caption("Smart Dash | Made by Shruti Srivastava")
